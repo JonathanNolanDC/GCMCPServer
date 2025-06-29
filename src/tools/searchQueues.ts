@@ -16,8 +16,7 @@ export interface ToolDependencies {
   readonly routingApi: Pick<RoutingApi, "getRoutingQueues">;
 }
 
-function formatQueues(
-  inputQueueName: string,
+function formatQueuesJson(
   queues: PartRequired<Models.Queue, "id" | "name">[],
   pagination: {
     pageNumber?: number;
@@ -25,27 +24,16 @@ function formatQueues(
     pageCount?: number;
     totalHits?: number;
   },
-) {
-  const queueItems = queues.flatMap((q) => [
-    `• Name: ${q.name}`,
-    `  • ID: ${q.id}`,
-    ...(q.description ? [`  • Description: ${q.description}`] : []),
-    ...(q.memberCount !== undefined
-      ? [`  • Member Count: ${String(q.memberCount)}`]
-      : []),
-  ]);
-
-  const firstLine =
-    pagination.totalHits !== undefined
-      ? `Found ${String(pagination.totalHits)} queues matching "${inputQueueName}":`
-      : `Found the following queues matching "${inputQueueName}":`;
-
-  return [
-    firstLine,
-    ...queueItems,
-    "",
-    ...paginationSection("Total Matching Queues", pagination),
-  ].join("\n");
+): Record<string, unknown> {
+  return {
+    queues: queues.map((q) => ({
+      name: q.name,
+      id: q.id,
+      ...(q.description ? { description: q.description } : {}),
+      ...(q.memberCount !== undefined ? { memberCount: q.memberCount } : {}),
+    })),
+    pagination: paginationSection("totalMatchingQueues", pagination),
+  };
 }
 
 const paramsSchema = z.object({
@@ -131,12 +119,14 @@ export const searchQueues: ToolFactory<
         content: [
           {
             type: "text",
-            text: formatQueues(name, foundQueues, {
-              pageNumber: result.pageNumber,
-              pageSize: result.pageSize,
-              pageCount: result.pageCount,
-              totalHits: result.total,
-            }),
+            text: JSON.stringify(
+              formatQueuesJson(foundQueues, {
+                pageNumber: result.pageNumber,
+                pageSize: result.pageSize,
+                pageCount: result.pageCount,
+                totalHits: result.total,
+              }),
+            ),
           },
         ],
       };
